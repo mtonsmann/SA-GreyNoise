@@ -5,12 +5,11 @@ from __future__ import print_function
 
 import functools
 import json
-from xml.dom.minidom import parseString
 
 import ansimarkup
 import click
 import colorama
-from dicttoxml import dicttoxml
+from dict2xml import dict2xml
 from jinja2 import Environment, PackageLoader, select_autoescape
 
 JINJA2_ENV = Environment(
@@ -19,15 +18,18 @@ JINJA2_ENV = Environment(
 )
 
 colorama.init()
+DIM = "<dim>"
 ANSI_MARKUP = ansimarkup.AnsiMarkup(
     tags={
         "header": ansimarkup.parse("<bold>"),
         "key": ansimarkup.parse("<blue>"),
         "value": ansimarkup.parse("<green>"),
         "noise": ansimarkup.parse("<light-yellow>"),
-        "not-noise": ansimarkup.parse("<dim>"),
+        "not-noise": ansimarkup.parse(DIM),
+        "riot": ansimarkup.parse("<light-yellow>"),
+        "not-riot": ansimarkup.parse(DIM),
         "malicious": ansimarkup.parse("<light-red>"),
-        "unknown": ansimarkup.parse("<dim>"),
+        "unknown": ansimarkup.parse(DIM),
         "benign": ansimarkup.parse("<light-green>"),
     }
 )
@@ -53,12 +55,26 @@ def colored_output(function):
 
 def json_formatter(result, _verbose):
     """Format result as json."""
-    return json.dumps(result, indent=4, sort_keys=True)
+    if isinstance(result, list) and "data" in result[0]:
+        res = [json.dumps(record) for record in result[0]["data"]]
+        output = "\n".join(res)
+    else:
+        output = json.dumps(result, indent=4, sort_keys=True)
+
+    return output
 
 
 def xml_formatter(result, _verbose):
     """Format result as xml."""
-    return parseString(dicttoxml(result)).toprettyxml()
+    xml_formatted = ""
+    if type(result) is list:
+        xml_formatted = dict2xml({"item": result}, wrap="root", indent="\t")
+    else:
+        xml_formatted = dict2xml(result, wrap="root", indent="   ")
+
+    # dict2xml does not add header, so add header manually
+    xml_header = '<?xml version="1.0" ?>'
+    return "{}\n{}".format(xml_header, xml_formatted)
 
 
 def get_location(metadata):
@@ -126,6 +142,14 @@ def analyze_formatter(result, verbose):
     return template.render(result=result, verbose=verbose, max_width=max_width)
 
 
+@colored_output
+def riot_formatter(results, verbose):
+    """Convert RIOT to human-readable text."""
+    template = JINJA2_ENV.get_template("riot.txt.j2")
+    max_width, _ = click.get_terminal_size()
+    return template.render(results=results, verbose=verbose, max_width=max_width)
+
+
 FORMATTERS = {
     "json": json_formatter,
     "xml": xml_formatter,
@@ -135,5 +159,6 @@ FORMATTERS = {
         "quick": ip_quick_check_formatter,
         "query": gnql_query_formatter,
         "stats": gnql_stats_formatter,
+        "riot": riot_formatter,
     },
 }

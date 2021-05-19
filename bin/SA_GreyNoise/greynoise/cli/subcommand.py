@@ -153,6 +153,24 @@ def ip(
     return results
 
 
+@ip_lookup_command
+@click.option("-v", "--verbose", count=True, help="Verbose output")
+def riot(
+    context,
+    api_client,
+    api_key,
+    input_file,
+    output_file,
+    output_format,
+    verbose,
+    ip_address,
+):
+    """Query GreyNoise IP to see if it is in the RIOT dataset."""
+    ip_addresses = get_ip_addresses(context, input_file, ip_address)
+    results = [api_client.riot(ip_address=ip_address) for ip_address in ip_addresses]
+    return results
+
+
 @not_implemented_command
 def pcap():
     """Get PCAP for a given IP address."""
@@ -184,7 +202,8 @@ def quick(
 @click.option("-k", "--api-key", required=True, help="Key to include in API requests")
 @click.option("-t", "--timeout", type=click.INT, help="API client request timeout")
 @click.option("-s", "--api-server", help="API server")
-def setup(api_key, timeout, api_server):
+@click.option("-p", "--proxy", help="Proxy URL")
+def setup(api_key, timeout, api_server, proxy):
     """Configure API key."""
     config = {"api_key": api_key}
 
@@ -197,6 +216,11 @@ def setup(api_key, timeout, api_server):
         config["api_server"] = DEFAULT_CONFIG["api_server"]
     else:
         config["api_server"] = api_server
+
+    if proxy is None:
+        config["proxy"] = DEFAULT_CONFIG["proxy"]
+    else:
+        config["proxy"] = proxy
 
     save_config(config)
     click.echo("Configuration saved to {!r}".format(CONFIG_FILE))
