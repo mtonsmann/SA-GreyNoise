@@ -63,7 +63,7 @@ def handle_exceptions(function):
             return function(*args, **kwargs)
         except RequestFailure as exception:
             body = exception.args[1]
-            error_message = "API error: {}".format(body["error"])
+            error_message = "API error: {}".format(body["message"])
             LOGGER.error(error_message)
             click.echo(error_message)
             click.get_current_context().exit(-1)
@@ -90,6 +90,7 @@ def pass_api_client(function):
     def wrapper(*args, **kwargs):
         context = click.get_current_context()
         api_key = context.params.get("api_key")
+        offering = context.params.get("offering")
         config = load_config()
 
         if api_key is None:
@@ -108,8 +109,17 @@ def pass_api_client(function):
                 context.exit(-1)
             api_key = config["api_key"]
 
+        if offering is None:
+            if not config["offering"]:
+                offering = "enterprise"
+            else:
+                offering = config["offering"]
+
         api_client = GreyNoise(
-            api_key=api_key, timeout=config["timeout"], integration_name="cli"
+            api_key=api_key,
+            offering=offering,
+            timeout=config["timeout"],
+            integration_name="cli",
         )
         return function(api_client, *args, **kwargs)
 
@@ -122,6 +132,12 @@ def gnql_command(function):
     @click.command()
     @click.argument("query", required=False)
     @click.option("-k", "--api-key", help="Key to include in API requests")
+    @click.option(
+        "-O",
+        "--offering",
+        help="Which API offering to use, enterprise or community, "
+        "defaults to enterprise",
+    )
     @click.option("-i", "--input", "input_file", type=click.File(), help="Input file")
     @click.option(
         "-o", "--output", "output_file", type=click.File(mode="w"), help="Output file"
@@ -152,6 +168,12 @@ def ip_lookup_command(function):
     @click.command()
     @click.argument("ip_address", callback=ip_addresses_parameter, nargs=-1)
     @click.option("-k", "--api-key", help="Key to include in API requests")
+    @click.option(
+        "-O",
+        "--offering",
+        help="Which API offering to use, enterprise or community, "
+        "defaults to enterprise",
+    )
     @click.option("-i", "--input", "input_file", type=click.File(), help="Input file")
     @click.option(
         "-o", "--output", "output_file", type=click.File(mode="w"), help="Output file"
