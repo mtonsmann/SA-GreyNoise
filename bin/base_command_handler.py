@@ -49,7 +49,13 @@ class BaseCommandHandler(GeneratingCommand):
                 msg = "Unauthorized. Please check your API key."
             else:
                 # Need to handle this, as splunklib is unable to handle the exception with (400, {'error': 'error_reason'}) format
-                msg = "The API call to the GreyNoise platform have been failed with status_code: {} and error: {}".format(response_code, response_message['error'] if isinstance(response_message, dict) else response_message)
+                msg = "The API call to the GreyNoise platform has failed with status_code: " + response_code + "and error: "
+                # Error Message may be in 'error' or 'message' key in dict with addition of RIOT endpoint
+                if isinstance(response_message, dict):
+                    if 'error' in response_message.keys:
+                        msg += response_message['error']
+                    elif 'message' in response_message.keys:
+                        msg += response_message['message']
 
             logger.error("{}".format(str(msg)))
             self.write_error(msg)

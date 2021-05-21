@@ -159,8 +159,8 @@ def method_response_mapper(method, result, logger):
     """
     generate_missing_events = False
 
-    if method == 'enrich':
-        # Response from the ip method used for enrich will have single dict in response but the event_processor will expect a list of dicts
+    if method == 'enrich' or method == 'riot':
+        # Response from the ip method used for enrich/riot will have single dict in response but the event_processor will expect a list of dicts
         # Therefore masking the response to the list if the API response is proper and intact
         if result['message'] == 'ok':
             result['response'] = [
