@@ -105,6 +105,8 @@ def get_all_events(api_client, method, ip_field, chunk_dict, logger, threads=3):
 
     if method == 'ip' or method == 'enrich':
         fetch_method = api_client.ip
+    elif method == 'riot':
+        fetch_method = api_client.riot
     else:
         # For 'multi' and 'filter' commands
         fetch_method = api_client.quick
