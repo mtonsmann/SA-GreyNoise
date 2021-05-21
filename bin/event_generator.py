@@ -29,7 +29,7 @@ from greynoise.exceptions import RateLimitError, RequestFailure
 
 from utility import get_dict, nested_dict_iter
 
-GENERATING_COMMAND_METHODS = ['ip', 'quick', 'query', 'stats']
+GENERATING_COMMAND_METHODS = ['ip', 'quick', 'query', 'stats', 'riot']
 
 def pull_data_from_api(fetch_method, logger, params, api_sleep_timer=3):
     """
@@ -66,7 +66,15 @@ def pull_data_from_api(fetch_method, logger, params, api_sleep_timer=3):
     except RequestFailure as e:
         response_code, response_message = e.args
         # Need to handle this, as splunklib is unable to handle the exception with (400, {'error': 'error_reason'}) format
-        msg = "The API call to the GreyNoise platform have been failed with status_code: {} and error: {}".format(response_code, response_message['error'] if isinstance(response_message, dict) else response_message)
+        msg = "The API call to the GreyNoise platform has failed with status_code: " + str(response_code) + " and error: "
+        # Error Message may be in 'error' or 'message' key in dict with addition of RIOT endpoint
+        if isinstance(response_message, dict):
+            if 'error' in response_message.keys():
+                msg += response_message['error']
+            elif 'message' in response_message.keys():
+                msg += response_message['message']
+        else:
+            msg += response_message
         logger.error("{}".format(str(msg)))
         return {
             'message': 'error',
@@ -115,7 +123,7 @@ def get_all_events(api_client, method, ip_field, chunk_dict, logger, threads=3):
     
     with ThreadPoolExecutor(max_workers=threads) as executor:
         # Doing this to pass the multiple arguments to method used in map method
-        if method == 'enrich':
+        if method == 'enrich' or method == 'riot':
             ips = []
             for ip_list in list(chunk_dict.values()):
                 try:
@@ -200,7 +208,7 @@ def event_processor(records_dict, result, method, ip_field, logger):
         for event in api_results:
             ip_lookup[event['ip']] = event
 
-    # This will be called per chunk to yield the events as per the objective of trasnforming command
+    # This will be called per chunk to yield the events as per the objective of transforming command
     for record in records_dict[0]:
 
         if error_flag:
@@ -225,6 +233,10 @@ def event_processor(records_dict, result, method, ip_field, logger):
                     # Deleting the raw_data from the response when the request method is enrich
                     if method == 'enrich' and 'raw_data' in ip_lookup[record[ip_field]]:
                         del ip_lookup[record[ip_field]]['raw_data']
+                    
+                    # Deleting the logo_url from the response when the request method is riot
+                    if method == 'riot' and 'logo_url' in ip_lookup[record[ip_field]]:
+                        del ip_lookup[record[ip_field]]['logo_url']
                     
                     yield make_valid_event(method, ip_lookup[record[ip_field]], True, record)
                 else:

@@ -45,7 +45,7 @@ class RIOTEnrichCommand(EventingCommand):
             USE_CACHE = False
             ip_field = self.ip_field
             
-            logger.info("Started retrieving context information for the IP addresses present in field: {}".format(str(ip_field)))
+            logger.info("Started retrieving RIOT status for the IP addresses present in field: {}".format(str(ip_field)))
 
             try:
                 # Strip the spaces from the parameter value if given
