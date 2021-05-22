@@ -120,3 +120,14 @@ ENRICH_FIELDS = {
     'greynoise_os': None,
     'greynoise_error': None
 }
+
+RIOT_FIELDS = {
+    'greynoise_ip': None,
+    'greynoise_riot': None,
+    'greynoise_category': None,
+    'greynoise_name': None,
+    'greynoise_description': None,
+    'greynoise_explaination': None,
+    'greynoise_last_updated': None,
+    'greynoise_reference': None
+}

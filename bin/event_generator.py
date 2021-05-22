@@ -29,7 +29,7 @@ from greynoise.exceptions import RateLimitError, RequestFailure
 
 from utility import get_dict, nested_dict_iter
 
-GENERATING_COMMAND_METHODS = ['ip', 'quick', 'query', 'stats', 'riot']
+GENERATING_COMMAND_METHODS = ['ip', 'quick', 'query', 'stats']
 
 def pull_data_from_api(fetch_method, logger, params, api_sleep_timer=3):
     """

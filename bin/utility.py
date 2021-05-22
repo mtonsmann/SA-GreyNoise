@@ -134,7 +134,8 @@ def get_dict(method):
         'query': fields.QUERY_FIELDS,
         'multi': fields.MULTI_FIELDS,
         'filter': fields.FILTER_FIELDS,
-        'enrich': fields.ENRICH_FIELDS
+        'enrich': fields.ENRICH_FIELDS,
+        'riot': fields.RIOT_FIELDS
     }
     return dict_hash.get(method, fields.DEFAULT_FIELDS)
 
