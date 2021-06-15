@@ -13,7 +13,7 @@ from greynoise_exceptions import APIKeyNotFoundError
 import utility
 import validator
 
-def event_filter(chunk_index, result, records_dict, ip_field, noise_events, method):
+def event_filter(chunk_index, result, records_dict, ip_field, riot_event, method):
     
     api_results = result['response']
     error_flag = True
@@ -31,7 +31,7 @@ def event_filter(chunk_index, result, records_dict, ip_field, noise_events, meth
             # Exception has occured while fetching the noise statuses from API
             if ip_field in record and record[ip_field] != '':
                 # These calls have been failed due to API failure, as this event have IP address value, considering them as noise
-                if noise_events:
+                if riot_event:
                     event = {
                         'ip': record[ip_field],
                         'error': api_results
@@ -41,7 +41,7 @@ def event_filter(chunk_index, result, records_dict, ip_field, noise_events, meth
                 # Either the record is not having IP field or the value of the IP field is ''
                 # send the record as it is as it doesn't have any IP address, after appending all fields
                 # Considering this event as non-noisy
-                if not noise_events:
+                if not riot_event:
                     yield event_generator.make_invalid_event(method, {}, True, record)
         else:
             # Successful execution of the API call
@@ -49,37 +49,37 @@ def event_filter(chunk_index, result, records_dict, ip_field, noise_events, meth
 
                 # Check if the IP field is not an iterable to avoid any error while referencing ip in ip_lookup
                 if isinstance(record[ip_field], six.string_types) and record[ip_field] in ip_lookup:
-                    if ip_lookup[record[ip_field]]['noise'] == noise_events:
+                    if ip_lookup[record[ip_field]]['riot'] == riot_event:
                         yield event_generator.make_valid_event(method, ip_lookup[record[ip_field]], True, record)
                 else:
                     # Meaning ip is either invalid or not returned by the API, which is case of `multi` method only
                     # Invalid IPs are considered as non-noise
-                    if not noise_events:
+                    if not riot_event:
                         event = {
                             'ip': record[ip_field],
                             'error': 'IP address doesn\'t match the valid IP format'
                         }
                         yield event_generator.make_invalid_event(method, event, True, record)
             else:
-                if not noise_events:
+                if not riot_event:
                     # Either the record is not having IP field or the value of the IP field is ''
                     # send the record as it is as it doesn't have any IP address, after appending all fields
                     # Considering this event as non-noisy
                     yield event_generator.make_invalid_event(method, {}, True, record)
 
 @Configuration()
-class GNFilterCommand(EventingCommand):
+class RIOTFilterCommand(EventingCommand):
     """
-    Transforming command that returns events having noisy/not noisy IP addresses 
-    as specified with noise_events parameter, defaults to true.
-    Data pulled from: /v2/noise/multi/quick
+    Transforming command that returns events according to IP address RIOT (Rule It OuT) status 
+    as specified with riot_events parameter, defaults to false.
+    Data pulled from: /v2/riot/ip
 
     **Syntax**::
-    `index=firewall | gnfilter ip_field="ip" noise_events="false"
+    `index=firewall | riotfilter ip_field="ip" riot_events="false"
 
     **Description**::
-    The `gnfilter` command returns the events having noisy/not noisy IP addresses represented by `ip_field` parameter
-    using method :method:`quick` from GreyNoise Python SDK. 
+    The `riotfilter` command returns the events with IP addresses represented by `ip_field` parameter
+    according to RIOT status using method :method:`riot` from GreyNoise Python SDK. 
     """
 
     ip_field = Option(
@@ -89,16 +89,16 @@ class GNFilterCommand(EventingCommand):
         name='ip_field', require=True
     )
 
-    noise_events = Option(
+    riot_event = Option(
         doc='''
-        **Syntax:** **noise_events=***<true/false>*
-        **Description:** Flag specifying whether to return events having noisy IP or events having non-noisy IP addresses''',
-        name='noise_events', require=False, default="True"
+        **Syntax:** **riot_event=***<true/false>*
+        **Description:** Flag specifying whether to return events in RIOT (Rule It OuT) dataset or events not in dataset (default to False)''',
+        name='riot_event', require=False, default="False"
     )
 
     def transform(self, records):
 
-        method = 'filter'
+        method = 'riot'
 
         # Setup logger
         logger = utility.setup_logger(session_key=self._metadata.searchinfo.session_key, log_context=self._metadata.searchinfo.command)
@@ -110,19 +110,19 @@ class GNFilterCommand(EventingCommand):
             THREADS = 3
             USE_CACHE = False
             ip_field = self.ip_field
-            noise_events = self.noise_events
+            riot_event = self.riot_event
 
-            logger.info("Started filtering the IP address(es) present in field: {}, with noise_status: {}".format(str(ip_field), str(noise_events)))
+            logger.info("Started filtering the IP address(es) present in field: {}, with riot_status: {}".format(str(ip_field), str(riot_event)))
             
             try:
                 if ip_field:
                     ip_field = ip_field.strip()
-                if noise_events:
-                    noise_events = noise_events.strip()
+                if riot_event:
+                    riot_event = riot_event.strip()
                 # Validating the given parameters
                 try:
                     ip_field = validator.Fieldname(option_name='ip_field').validate(ip_field)
-                    noise_events = validator.Boolean(option_name='noise_events').validate(noise_events)
+                    riot_event = validator.Boolean(option_name='riot_event').validate(riot_event)
                 except ValueError as e:
                     # Validator will throw ValueError with error message when the parameters are not proper
                     logger.error(str(e))
@@ -169,7 +169,7 @@ class GNFilterCommand(EventingCommand):
                 if len(list(chunk_dict.values())[0][0]) >= 1:
                     for chunk_index, result in event_generator.get_all_events(api_client, method, ip_field, chunk_dict, logger, threads=THREADS):
                         # Pass the collected data to the event filter method
-                        for event in event_filter(chunk_index, result, chunk_dict[chunk_index], ip_field, noise_events, method):
+                        for event in event_filter(chunk_index, result, chunk_dict[chunk_index], ip_field, riot_event, method):
                             yield event
                         
                         # Deleting the chunk with the events that are already indexed
@@ -184,9 +184,9 @@ class GNFilterCommand(EventingCommand):
                 self.write_error("Exception occured while filtering the events based on noise status. See greynoise_main.log for more details.")
 
     def __init__(self):
-        super(GNFilterCommand, self).__init__()
+        super(RIOTFilterCommand, self).__init__()
 
-dispatch(GNFilterCommand, sys.argv, sys.stdin, sys.stdout, __name__)
+dispatch(RIOTFilterCommand, sys.argv, sys.stdin, sys.stdout, __name__)
 
 
 
